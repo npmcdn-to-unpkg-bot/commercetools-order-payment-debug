@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <title>CT Order Payment Debug</title>
+
+    <!-- Bootstrap -->
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+    <!-- Optional theme -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+
+    <!--[if lt IE 9]>
+    <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
+    <![endif]-->
+</head>
+<body>
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="#">CHECKOUT DEBUG</a>
+            </div>
+            <div id="navbar" class="navbar-collapse collapse">
+                <!--<ul class="nav navbar-nav navbar-right">
+                    <li><a href="#">Not a menu yet</a></li>
+                </ul>-->
+                <form class="navbar-form navbar-right" id="searchform">
+                    <input type="text" class="form-control" placeholder="project key..." id="projectKey">
+                    <input type="text" class="form-control" placeholder="Client ID..." id="clientId">
+                    <input type="text" class="form-control" placeholder="Client secret..." id="clientSecret">
+                    <input type="text" class="form-control" placeholder="OR: token" id="accessToken">
+                    <input type="text" class="form-control" placeholder="email, id, PSP id, ..." id="searchbox">
+                    <button class="btn btn-default" type="submit">Search</button>
+                </form>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <h2>Carts</h2>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>CT ID</th>
+                            <th>cartState</th>
+                            <th>totalPrice</th>
+                            <th>customerEmail</th>
+                            <th>customerId</th>
+                        </tr>
+                    </thead>
+                    <tbody id="carts-list">
+                        <script id="cart-template" type="text/x-handlebars-template">
+                            <tr>
+                                <td>{{id}}</td>
+                                <td>{{cartState}}</td>
+                                <td>{{money totalPrice}}</td>
+                                <td>{{customerEmail}}</td>
+                                <td>{{customerId}}</td>
+                            </tr>
+                            <tr>
+                                <td>Payments:</td>
+                                <td colspan="4">
+                                    <table class="table table-striped table-condensed">
+                                        <thead>
+                                            <tr>
+                                                <th>CT ID</th>
+                                                <th>payment Interface (PSP)</th>
+                                                <th>payment Method</th>
+                                                <th>interfaceId (PSP ID)</th>
+                                                <th>amountPlanned</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        {{#each paymentInfo.payments}}
+                                            {{> payment }}
+                                        {{/each}}
+                                        </tbody>
+                                    </table>
+                                </td>
+                            </tr>
+                        </script>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="row">
+            <h2>Payments:</h2>
+            <div id="allpayments"></div>
+        </div>
+    </div>
+
+    <!-- Handlebars templates -->
+    <script id="payment-table-template" type="text/x-handlebars-template">
+        <table class="table table-bordered">
+            <thead>
+            <tr>
+                <th>CT ID</th>
+                <th>created</th>
+                <th>amountPlanned</th>
+                <th>payment Method</th>
+                <th>payment Interface (PSP)</th>
+                <th>interfaceId (PSP ID)</th>
+            </tr>
+            </thead>
+            <tbody>
+            {{#each payments}}
+                {{> payment-row }}
+            {{/each}}
+            </tbody>
+        </table>
+
+    </script>
+    <script id="payment-row-template" type="text/x-handlebars-template">
+        <tr>
+            <td rowspan="3">{{id}}</td>
+            <td>{{dateTime createdAt}}</td>
+            <td>{{money amountPlanned}}</td>
+            <td>{{paymentMethodInfo.method}}</td>
+            <td>{{paymentMethodInfo.paymentInterface}}</td>
+            <td>{{interfaceId}}</td>
+        </tr>
+        <tr>
+            <td colspan="5">
+                <h4>Transactions:</h4>
+                {{> transaction-table}}
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="5">
+                <h4>PSP Interactions:</h4>
+                {{#each interfaceInteractions}}
+                {{dateTime fields.timestamp}}
+                <pre style="white-space: pre-wrap;">{{json fields}}</pre>
+                {{/each}}
+            </td>
+        </tr>
+    </script>
+    <script id="transaction-table-template" type="text/x-handlebars-template">
+        <table class="table table-condensed">
+            <thead>
+                <tr>
+                    <th>timestamp</th>
+                    <th>amount</th>
+                    <th>type</th>
+                    <th>state</th>
+                    <th>interactionId / PSP ID</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each transactions}}
+                    {{> transaction-row }}
+                {{/each}}
+            </tbody>
+        </table>
+
+    </script>
+    <script id="transaction-row-template" type="text/x-handlebars-template">
+        <tr class="{{transClass state}}">
+            <td>{{dateTime timestamp}}</td>
+            <td>{{money amount}}</td>
+            <td>{{type}}</td>
+            <td>{{state}}</td>
+            <td>{{interactionId}}</td>
+        </tr>
+    </script>
+
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <!-- Latest compiled and minified JavaScript -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+    <!-- Handlebars From CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0/handlebars.js"></script>
+
+    <!-- get the commercetools js sdk -->
+    <script src="SphereClient.min.js"></script>
+
+    <script>
+        "use strict";
+
+        $("#projectKey").val(localStorage.getItem('projectKey'));
+        $("#clientId").val(localStorage.getItem('clientId'));
+        $("#clientSecret").val(localStorage.getItem('clientSecret'));
+        $("#accessToken").val(localStorage.getItem('accessToken'));
+        $("#searchbox").val(localStorage.getItem('search'));
+
+        Handlebars.registerHelper('money', function(ctMoney) {
+            var result = (ctMoney.centAmount / 100).toString() + " " + ctMoney.currencyCode;
+            return new Handlebars.SafeString(result);
+        });
+        Handlebars.registerHelper('dateTime', function(ctDateTime) {
+            var t = new Date(Date.parse(ctDateTime));
+            return t.toLocaleString();
+        });
+        Handlebars.registerHelper('json', function(object){
+            return new Handlebars.SafeString(JSON.stringify(object));
+        });
+        Handlebars.registerHelper('transClass', function(state){
+            var classes = {
+                "Success": "success",
+                "Pending": "",
+                "Failure": "danger"
+            }
+            return classes[state];
+        });
+
+
+        var cartTemplate = Handlebars.compile($("#cart-template").html());
+        Handlebars.registerPartial('cart', cartTemplate);
+        var paymentTableTemplate = Handlebars.compile($("#payment-table-template").html());
+        Handlebars.registerPartial('payment-table', paymentTableTemplate);
+        var paymentRowTemplate = Handlebars.compile($("#payment-row-template").html());
+        Handlebars.registerPartial('payment-row', paymentRowTemplate);
+        var transactionTableTemplate = Handlebars.compile($("#transaction-table-template").html());
+        Handlebars.registerPartial('transaction-table', transactionTableTemplate);
+        var transactionRowTemplate = Handlebars.compile($("#transaction-row-template").html());
+        Handlebars.registerPartial('transaction-row', transactionRowTemplate);
+
+        $("#searchform").submit(function(e) {
+
+            var search = $("#searchbox").val();
+            search = search.trim();
+
+            var Errors = SphereClient.default.errors;
+            var credentials = {
+                "projectKey": $("#projectKey").val().trim(),
+                "clientId": $("#clientId").val().trim(),
+                "clientSecret": $("#clientSecret").val().trim()
+            };
+            var auth = {"accessToken": $("#accessToken").val().trim(), "credentials": credentials};
+            var clientConfig = {"auth": auth};
+
+            localStorage.setItem('projectKey', credentials.projectKey);
+            localStorage.setItem('clientId', credentials.clientId);
+            localStorage.setItem('clientSecret', credentials.clientSecret);
+            localStorage.setItem('accessToken', auth.accessToken);
+            localStorage.setItem('search', search);
+
+            if (!credentials.projectKey || !auth.accessToken) {
+                alert("please enter project key and an access token");
+                return;
+            }
+            var client = SphereClient.default.create(clientConfig);
+
+            // first collect payments that match:
+            var payments;
+            // query differs for UUID vs. empty vs. others
+            if (!search){
+                payments = client.payments.sort('createdAt', false);
+            }else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(search)) {
+                payments = client.payments
+                        .where('id="' + search + '"')
+            }else{
+                payments = client.payments
+                        .where('interfaceId="'+search+'"')
+                        .whereOperator('or')
+                        .where('transactions(interactionId="'+search+'")');
+            }
+            payments.fetch().then(function(response) {
+                $("#allpayments").html(paymentTableTemplate({"payments": response.body.results}));
+            }).catch(function(e) { alert(e)});
+
+            // Then query carts and orders for them plus more matches.
+
+            // then render from carts down, using reference expansion.
+
+        });
+    </script>
+
+</body>
+</html>
+
+
+
+
+
