@@ -29,6 +29,7 @@
                     <span class="icon-bar"></span>
                 </button>
                 <a class="navbar-brand" href="#">CHECKOUT DEBUG</a>
+                <p style="color:white;">Get an access token from <a href="https://impex.sphere.io/playground" target="impex">IMPEX playground</a>. Use the "project" API and copy the token from the Headers.</p>
             </div>
             <div id="navbar" class="navbar-collapse collapse">
                 <!--<ul class="nav navbar-nav navbar-right">
@@ -230,7 +231,9 @@
         var transactionRowTemplate = Handlebars.compile($("#transaction-row-template").html());
         Handlebars.registerPartial('transaction-row', transactionRowTemplate);
 
-        $('#searchform').submit(function(e) {
+        // Temp do it in global scope for more reliable browser error messages.
+        window.doSearch = function(e){
+            e.preventDefault();
 
             var search = $('#searchbox').val();
             search = search.trim();
@@ -259,13 +262,39 @@
             }
             var client = SphereClient.default.create(clientConfig);
             var features = SphereClient.default.features;
+            var readFeatures = [features.read, features.query, features.queryOne, features.queryExpand, features.queryString];
             client.registerService('payments',{
-                    type: 'payments',
-                    endpoint: '/payments',
-                    features: [features.read, features.query, features.queryOne, features.queryExpand, features.queryString],
-                  }, clientConfig);
+                type: 'payments',
+                endpoint: '/payments',
+                features: readFeatures,
+            }, clientConfig);
+            client.registerService('carts',{
+                type: 'carts',
+                endpoint: '/carts',
+                features: readFeatures,
+            }, clientConfig);
 
-            // first collect payments that match:
+//            // collect carts that match
+//            var carts;
+//            if (!search){
+//                carts = client.carts.sort('createdAt', false);
+//            }else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(search)) {
+//                carts = client.carts
+//                        .where('id="' + search + '"')
+//                        .whereOperator('or')
+//                        .where('paymentInfo(payments(id="'+search+'"))')
+//            }else{
+//                carts = client.carts
+//                        .where('customerEmail="'+search+'"')
+//                        .whereOperator('or')
+//                        .where('customerId="'+search+'")');
+//            }
+//            carts.fetch().then(function(result) {
+//                console.log(response);
+//            });
+//
+
+            //  collect payments that match:
             var payments;
             // query differs for UUID vs. empty vs. others
             if (!search){
@@ -279,8 +308,9 @@
                         .whereOperator('or')
                         .where('transactions(interactionId="'+search+'")');
             }
+
             payments.fetch().then(function(response) {
-                if (!response.ok) {throw Error(response.statusText);}
+                if (!response.statusCode == 200) {throw Error(response);}
                 return response;
             }).then(function(response) {
                 console.log(response);
@@ -289,11 +319,10 @@
                 console.log(error);
             });
 
-            // Then query carts and orders for them plus more matches.
+        };
 
-            // then render from carts down, using reference expansion.
+        $('#searchform').submit(window.doSearch);
 
-        });
     </script>
 
 </body>
