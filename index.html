@@ -36,9 +36,9 @@
                 </ul>-->
                 <form class="navbar-form navbar-right" id="searchform">
                     <input type="text" class="form-control" placeholder="project key..." id="projectKey">
-                    <input type="text" class="form-control" placeholder="Client ID..." id="clientId">
-                    <input type="text" class="form-control" placeholder="Client secret..." id="clientSecret">
-                    <input type="text" class="form-control" placeholder="OR: token" id="accessToken">
+                    <!--<input type="text" class="form-control" placeholder="Client ID..." id="clientId">
+                    <input type="text" class="form-control" placeholder="Client secret..." id="clientSecret">-->
+                    <input type="text" class="form-control" placeholder="Access token" id="accessToken">
                     <input type="text" class="form-control" placeholder="email, id, PSP id, ..." id="searchbox">
                     <button class="btn btn-default" type="submit">Search</button>
                 </form>
@@ -185,15 +185,16 @@
     <!-- Handlebars From CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0/handlebars.js"></script>
 
-    <!-- get the commercetools js sdk -->
-    <script src="SphereClient.min.js"></script>
+    <!-- commercetools Javascript SDK -->
+    <!--<script src="https://npmcdn.com/sphere-node-sdk@2.0.0-alpha.40/dist/sphere-node-sdk.min.js"></script>-->
+    <script src="https://npmcdn.com/sphere-node-sdk@2.0.0-alpha.40/dist/sphere-node-sdk.js"></script>
 
     <script>
-        "use strict";
+        'use strict';
 
         $("#projectKey").val(localStorage.getItem('projectKey'));
-        $("#clientId").val(localStorage.getItem('clientId'));
-        $("#clientSecret").val(localStorage.getItem('clientSecret'));
+        // $("#clientId").val(localStorage.getItem('clientId'));
+        // $("#clientSecret").val(localStorage.getItem('clientSecret'));
         $("#accessToken").val(localStorage.getItem('accessToken'));
         $("#searchbox").val(localStorage.getItem('search'));
 
@@ -210,10 +211,10 @@
         });
         Handlebars.registerHelper('transClass', function(state){
             var classes = {
-                "Success": "success",
-                "Pending": "",
-                "Failure": "danger"
-            }
+                'Success': 'success',
+                'Pending': '',
+                'Failure': 'danger'
+            };
             return classes[state];
         });
 
@@ -229,31 +230,40 @@
         var transactionRowTemplate = Handlebars.compile($("#transaction-row-template").html());
         Handlebars.registerPartial('transaction-row', transactionRowTemplate);
 
-        $("#searchform").submit(function(e) {
+        $('#searchform').submit(function(e) {
 
-            var search = $("#searchbox").val();
+            var search = $('#searchbox').val();
             search = search.trim();
 
-            var Errors = SphereClient.default.errors;
             var credentials = {
-                "projectKey": $("#projectKey").val().trim(),
-                "clientId": $("#clientId").val().trim(),
-                "clientSecret": $("#clientSecret").val().trim()
+                'projectKey': $('#projectKey').val().trim(),
+                // 'clientId': $("#clientId").val().trim(),
+                // 'clientSecret': $("#clientSecret").val().trim()
             };
-            var auth = {"accessToken": $("#accessToken").val().trim(), "credentials": credentials};
-            var clientConfig = {"auth": auth};
+            var auth = {'accessToken': $('#accessToken').val().trim(), 'credentials': credentials};
+            var clientConfig = {
+                'auth': auth,
+                // hack: make the SDK not send a User-Agent in the CORS preflight. ( Platform Jira: CTP-425 )
+                'request': { 'headers': {} }
+            };
 
             localStorage.setItem('projectKey', credentials.projectKey);
-            localStorage.setItem('clientId', credentials.clientId);
-            localStorage.setItem('clientSecret', credentials.clientSecret);
+            // localStorage.setItem('clientId', credentials.clientId);
+            // localStorage.setItem('clientSecret', credentials.clientSecret);
             localStorage.setItem('accessToken', auth.accessToken);
             localStorage.setItem('search', search);
 
             if (!credentials.projectKey || !auth.accessToken) {
-                alert("please enter project key and an access token");
+                alert('please enter project key and an access token');
                 return;
             }
             var client = SphereClient.default.create(clientConfig);
+            var features = SphereClient.default.features;
+            client.registerService('payments',{
+                    type: 'payments',
+                    endpoint: '/payments',
+                    features: [features.read, features.query, features.queryOne, features.queryExpand, features.queryString],
+                  }, clientConfig);
 
             // first collect payments that match:
             var payments;
@@ -270,8 +280,14 @@
                         .where('transactions(interactionId="'+search+'")');
             }
             payments.fetch().then(function(response) {
-                $("#allpayments").html(paymentTableTemplate({"payments": response.body.results}));
-            }).catch(function(e) { alert(e)});
+                if (!response.ok) {throw Error(response.statusText);}
+                return response;
+            }).then(function(response) {
+                console.log(response);
+                $('#allpayments').html(paymentTableTemplate({'payments': response.body.results}));
+            }).catch(function(error) {
+                console.log(error);
+            });
 
             // Then query carts and orders for them plus more matches.
 
